@@ -2,6 +2,8 @@
 #include <fstream>
 #include <iostream>
 #include <thread>
+#include <exception>
+
 
 #include <QDateTime>
 #include <QHBoxLayout>
@@ -14,6 +16,7 @@
 #include "common/params.h"
 #include "common/timing.h"
 #include "common/swaglog.h"
+#include "common/watchdog.h"
 
 #include "home.hpp"
 #include "paint.hpp"
@@ -23,6 +26,7 @@
 
 #define BACKLIGHT_DT 0.25
 #define BACKLIGHT_TS 2.00
+#define BACKLIGHT_OFFROAD 512
 
 OffroadHome::OffroadHome(QWidget* parent) : QWidget(parent) {
   QVBoxLayout* main_layout = new QVBoxLayout();
@@ -160,6 +164,10 @@ void HomeWindow::setVisibility(bool offroad) {
 
 void HomeWindow::mousePressEvent(QMouseEvent* e) {
   UIState* ui_state = &glWindow->ui_state;
+  if (GLWindow::ui_state.scene.started && GLWindow::ui_state.scene.driver_view) {
+    Params().write_db_value("IsDriverViewEnabled", "0", 1);
+    return;
+  }
 
   glWindow->wake();
 
@@ -169,7 +177,7 @@ void HomeWindow::mousePressEvent(QMouseEvent* e) {
   }
 
   // Vision click
-  if (ui_state->started && (e->x() >= ui_state->viz_rect.x - bdr_s)) {
+  if (ui_state->scene.started && (e->x() >= ui_state->viz_rect.x - bdr_s)) {
     ui_state->sidebar_collapsed = !ui_state->sidebar_collapsed;
   }
 }
@@ -178,7 +186,7 @@ static void handle_display_state(UIState* s, bool user_input) {
   static int awake_timeout = 0; // Somehow this only gets called on program start
   awake_timeout = std::max(awake_timeout - 1, 0);
 
-  if (user_input || s->ignition || s->started) {
+  if (user_input || s->scene.ignition || s->scene.started) {
     s->awake = true;
     awake_timeout = 30 * UI_FREQ;
   } else if (awake_timeout == 0) {
@@ -187,10 +195,14 @@ static void handle_display_state(UIState* s, bool user_input) {
 }
 
 static void set_backlight(int brightness) {
-  std::ofstream brightness_control("/sys/class/backlight/panel0-backlight/brightness");
-  if (brightness_control.is_open()) {
-    brightness_control << brightness << "\n";
-    brightness_control.close();
+  try {
+    std::ofstream brightness_control("/sys/class/backlight/panel0-backlight/brightness");
+    if (brightness_control.is_open()) {
+      brightness_control << brightness << "\n";
+      brightness_control.close();
+    }
+  } catch (std::exception& e) {
+    qDebug() << "Error setting brightness";
   }
 }
 
@@ -204,10 +216,10 @@ GLWindow::GLWindow(QWidget* parent) : QOpenGLWidget(parent) {
   int result = read_param(&brightness_b, "BRIGHTNESS_B", true);
   result += read_param(&brightness_m, "BRIGHTNESS_M", true);
   if (result != 0) {
-    brightness_b = 200.0;
-    brightness_m = 10.0;
+    brightness_b = 10.0;
+    brightness_m = 1.0;
   }
-  smooth_brightness = 512;
+  smooth_brightness = BACKLIGHT_OFFROAD;
 }
 
 GLWindow::~GLWindow() {
@@ -236,8 +248,11 @@ void GLWindow::backlightUpdate() {
   // Update brightness
   float k = (BACKLIGHT_DT / BACKLIGHT_TS) / (1.0f + BACKLIGHT_DT / BACKLIGHT_TS);
 
-  float clipped_brightness = std::min(1023.0f, (ui_state.light_sensor * brightness_m) + brightness_b);
+  float clipped_brightness = ui_state.scene.started ?
+    std::min(1023.0f, (ui_state.scene.light_sensor * brightness_m) + brightness_b) : BACKLIGHT_OFFROAD;
+
   smooth_brightness = clipped_brightness * k + smooth_brightness * (1.0f - k);
+
   int brightness = smooth_brightness;
 
   if (!ui_state.awake) {
@@ -253,8 +268,8 @@ void GLWindow::timerUpdate() {
     makeCurrent();
   }
 
-  if (ui_state.started != onroad) {
-    onroad = ui_state.started;
+  if (ui_state.scene.started != onroad) {
+    onroad = ui_state.scene.started;
     emit offroadTransition(!onroad);
 
     // Change timeout to 0 when onroad, this will call timerUpdate continously.
@@ -266,6 +281,7 @@ void GLWindow::timerUpdate() {
 
   ui_update(&ui_state);
   repaint();
+  watchdog_kick();
 }
 
 void GLWindow::resizeGL(int w, int h) {
