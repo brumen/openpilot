@@ -50,11 +50,11 @@ class LaneGeneratorTS(LaneGeneratorCU):
         """ Shows the movie from images.
         """
 
-        for batch_set in self:
-
-            for sample in batch_set:
-                for X, y in sample:
-                    cv2.imshow('lines2', cv2.addWeighted(X, 0.6, y, 0.8, 0))
+        for X, y in self:
+            # X, y of shape (batch_size, nb_time_steps, image_x, image_y, nb_channels)
+            for batch_X, batch_y in zip(X, y):
+                for X_time_step, y_time_step in zip(batch_X, batch_y):
+                    cv2.imshow('lines2', cv2.addWeighted(X_time_step, 0.6, y_time_step, 0.8, 0))
                     cv2.waitKey(100)  # IMPORTANT line, DO NOT DELETE
 
 
@@ -72,8 +72,8 @@ def example_1():
                                      , scale_image=scale_size
                                      , batch_size=batch_size )
 
-    for x in train_generator:
-        print(x)
+#    for x in train_generator:
+#        print(x)
 
     train_generator.show_movie()
 

@@ -208,6 +208,16 @@ class HoughLines(LanesBase):
             for hough_line in hough_lines_sorted:
                 x1, y1, x2, y2 = hough_line[0]
 
+                # case x1 == x2
+                if x1 == x2:
+                    if y2 >= y1:  # positive inf slope
+                        lines_considered_left[np.inf] = [(x1, y1), (x2, y2)]
+                    else:
+                        lines_considered_right[np.inf] = [(x1, y1), (x2, y2)]
+
+                    continue
+
+                # x2 != x1
                 line_slope = (y2 - y1)/(x2 - x1)
 
                 if np.abs(line_slope) > 0.5:
@@ -240,58 +250,64 @@ class HoughLines(LanesBase):
 class HoughLanesImage(HoughLines):
 
     def __init__( self
-                , image                : np.ndarray
-                , roi_vertices         : Optional[List[Tuple[int, int]]] = None
-                , img_transform_params : Optional[Dict[str, Any]] = None ):
+                , image             : np.ndarray
+                , roi_vertices      : Optional[List[Tuple[int, int]]] = None
+                , hough_lines_param : Dict[str, Any] = None
+                , preprocess_param  : Dict[str, Any] = None
+                , ):
         """ Constructs lanes from the image.
 
         :param image: image of consideration
         :param roi_vertices: region of interest vertices A, B, C, D, given as A, D, C, B
-        :param img_transform_params: optional parameters for the image transformation
+        :param hough_lines_param: params for the hough_lines transformation
+        :param preprocess_param: params for the preprocess image
         """
 
-        self.image                  = image
-        self.roi_vertices           = roi_vertices
-        self.image_transform_params = img_transform_params
+        self.image              = image
+        self.roi_vertices       = roi_vertices
 
-        super().__init__(self._generate_hough_lines())
+        super().__init__(self.generate_hough_lines( preprocess_param, hough_lines_param))
 
-    def preprocess_image(self, image):
-        gray_img = cv2.cvtColor(image, cv2.COLOR_RGB2GRAY)
+    def preprocess_image( self
+                        , preprocess_params):
+
+        gray_range = preprocess_params['gray_range']
+        canny_range = preprocess_params['canny_range']
+
+        gray_img = cv2.cvtColor(self.image, cv2.COLOR_RGB2GRAY)
 
         # color/intensity
-        gray_select = cv2.inRange(gray_img, 150, 255)
+        gray_select = cv2.inRange(gray_img, gray_range[0], gray_range[1])
         gray_select_roi = gray_select if self.roi_vertices is None else self.__region_of_interest(gray_select, np.array([self.roi_vertices]))
-        img_canny = cv2.Canny(gray_select_roi, 50, 100)  # 50 = low_threshold 100 =  high_threshold)
+        img_canny = cv2.Canny(gray_select_roi, canny_range[0], canny_range[1])
+
         return cv2.GaussianBlur(img_canny, (3, 3), 0)  # 3, 3 is kernel_size
 
-    def _generate_hough_lines(self):
-        """ generates the hugh lines from the image.
+    def generate_hough_lines( self
+                            , preprocess_params
+                            , hough_params ):
+        """ generates the hugh lines from the image, given the parameters above:
+
         """
 
-        img_gaussian = self.preprocess_image(self.image)
+        img_gaussian = self.preprocess_image(preprocess_params)
 
-        # TODO: THESE ARE PARAMETERS - SO CONFIG CORRECTLY
-        rho = 1
-        theta = np.pi/180
-        threshold = 50
-        min_line_len = 100
-        max_line_gap = 20
+        min_line_len = hough_params.get('min_line_len')
+        if min_line_len is None:
+            y_size, x_size = self.image.shape[0], self.image.shape[1]
+            min_line_len_used = np.sqrt(x_size**2 + y_size**2)/20  # 1/20 ofe tenth of the
+        else:
+            min_line_len_used = min_line_len
 
         hough_lines_raw = cv2.HoughLinesP( img_gaussian
-                                         , rho
-                                         , theta
-                                         , threshold
+                                         , hough_params['rho']
+                                         , hough_params['theta']
+                                         , hough_params['threshold']
                                          , np.array([])
-                                         , minLineLength = min_line_len
-                                         , maxLineGap    = max_line_gap)
-        # remove hough lines which are very short
-        y_size, x_size = self.image.shape[0], self.image.shape[1]
-        repr_size = np.sqrt(x_size**2 + y_size**2)/20  # 1/20 ofe tenth of the
-        if hough_lines_raw is None:
-            return []
+                                         , minLineLength = min_line_len_used
+                                         , maxLineGap    = hough_params.get('max_line_gap') )
 
-        return list(filter(lambda x: np.sqrt((x[0][2] - x[0][0])**2 + (x[0][3] - x[0][1])**2) >= repr_size, hough_lines_raw))
+        return hough_lines_raw if hough_lines_raw is not None else []
 
     @staticmethod
     def __region_of_interest(img, vertices):
@@ -327,28 +343,154 @@ class HoughLanesImage(HoughLines):
         return self.__region_of_interest(curr_image.astype(np.uint8), np.array([self.roi_vertices]))
 
 
+class HoughLanesImage2(HoughLanesImage):
+
+    def preprocess_image(self, image):
+        gray_img = cv2.cvtColor(image, cv2.COLOR_RGB2GRAY)
+
+        # color/intensity
+        gray_select = cv2.inRange(gray_img, 150, 255)
+        gray_select_roi = gray_select if self.roi_vertices is None else self.__region_of_interest(gray_select, np.array([self.roi_vertices]))
+        img_canny = cv2.Canny(gray_select_roi, 50, 100)  # 50 = low_threshold 100 =  high_threshold)
+        return cv2.GaussianBlur(img_canny, (3, 3), 0)  # 3, 3 is kernel_size
+
+    def _identify_white_line(self, image):
+        """ Emphasize white line on the image, and identify it.
+        """
+        pass
+
+    def show_lines( self
+                      , image_size : Tuple[int, int]
+                      , pixel_tol  : int = 10) -> np.ndarray:
+        """ Generates the image with constructed hough lines.
+
+        """
+
+        curr_image = super().show_lines(image_size, pixel_tol=pixel_tol)
+
+        return self.__region_of_interest(curr_image.astype(np.uint8), np.array([self.roi_vertices]))
+
+
+def calibrate_pic(params, orig_mtx : np.ndarray, sol_mtx : np.ndarray, roi_vertices):
+    hough_params = {'rho': params[0]
+                    , 'theta': params[1]
+                    , 'threshold': int(params[2])
+                    , 'min_line_len': params[3]
+                    , 'max_line_gap': 20}
+    preprocess_params = {'gray_range': (int(params[4]), int(params[5]))
+                         , 'canny_range': (int(params[5]), int(params[6]))}
+
+    cl = HoughLanesImage( orig_mtx
+                        , roi_vertices=roi_vertices
+                        , hough_lines_param= hough_params
+                        , preprocess_param= preprocess_params )
+
+    res = cl.show_lines(sol_mtx.shape).astype(np.uint8)
+
+    diff_mtx = res - sol_mtx
+
+    return np.sum((diff_mtx * (diff_mtx > 0))**2)
+    #return np.sum(diff_mtx ** 2)
+
+
 from matplotlib import pyplot as plt
+
+image_nb = '00150'
+dir_nb = '05151640_0419'
+fname2 = f'/home/brumen/data/openpilot/CULane/driver_23_30frame/{dir_nb}.MP4/{image_nb}.jpg'
+
+#im = cv2.imread(fname2)
+
+#hl = HoughLanesImage(im, roi_vertices=[(200, 500), (730, 276), (1000, 250), (1400, 500) ])
+#hl.show_lines(im.shape[:2])
 
 # 540 x 960   # [[100, 540], [450, 320], [515, 320], [900, 540]]
 # 590 x 1640  # [[500, 500], [600, 250], [1000, 250], [1280, 500] ]  [[200, 500], [600, 250], [1000, 250], [1400, 500] ]
-def fname1(image_nb = '00150', dir_nb = '05151640_0419', rois = [[200, 500], [730, 276], [1000, 250], [1400, 500] ], fname3 = None):
-    fname2 = f'/home/brumen/data/openpilot/driver_23_30frame/{dir_nb}.MP4/{image_nb}.jpg' if fname3 is None else fname3
+def fname1(image_nb = '00150', dir_nb = '05151640_0419', rois = [(200, 500), (730, 276), (1000, 250), (1400, 500) ], fname3 = None):
+    fname2 = f'/home/brumen/data/openpilot/CULane/driver_23_30frame/{dir_nb}.MP4/{image_nb}.jpg' if fname3 is None else fname3
+    solution = f'/home/brumen/data/openpilot/CULane/driver_23_30frame/{dir_nb}.MP4/{image_nb}.lines.mtx.npy'
 
     im = cv2.imread(fname2)
-    cl = HoughLanesImage(im, rois)
+
+    hough_params = { 'rho': 1
+                   , 'theta': np.pi/180.
+                   , 'threshold': 50
+                   , 'min_line_len': None
+                   , 'max_line_gap': 20
+                   , }
+    preprocess_params = { 'gray_range': (150, 255)
+                        , 'canny_range': (50, 100)
+                        , }
+
+    cl = HoughLanesImage(im
+                        , roi_vertices=rois
+                        , hough_lines_param=hough_params
+                        , preprocess_param= preprocess_params
+                        , )
+
+    #preproc = cl.preprocess_image(im)
+
     im2 = np.array(cl.show_lines(im.shape[:2])).astype(np.uint8)
     im2 = cv2.cvtColor(im2 * 255, cv2.COLOR_GRAY2RGB)
     combined = cv2.addWeighted(im, 0.6, im2, 0.8, 0)
-    fig = plt.figure()
-    fig.add_subplot(3, 1, 1)
-    plt.imshow(im)
-    fig.add_subplot(3, 1, 2)
-    plt.imshow(im2)
-    fig.add_subplot(3, 1, 3)
-    plt.imshow(combined)
-    plt.show()
 
-    return im, cl, im2
+    cv2.imshow('orig', im)
+    cv2.imshow('combine', combined)
+    #cv2.imshow('preproc', preproc)
+    cv2.waitKey(100)
+
+    #fig = plt.figure()
+    #fig.add_subplot(3, 1, 1)
+    #plt.imshow(im)
+    #fig.add_subplot(3, 1, 2)
+    #plt.imshow(im2)
+    #fig.add_subplot(3, 1, 3)
+    #plt.imshow(combined)
+    #plt.show()
+
+    return im, cl, im2, preproc
+
+
+def fname5(image_nb = '00150', dir_nb = '05151640_0419', rois = [(200, 500), (730, 276), (1000, 250), (1400, 500) ], fname3 = None):
+    fname2 = f'/home/brumen/data/openpilot/CULane/driver_23_30frame/{dir_nb}.MP4/{image_nb}.jpg' if fname3 is None else fname3
+    solution = f'/home/brumen/data/openpilot/CULane/driver_23_30frame/{dir_nb}.MP4/{image_nb}.lines.mtx.npy'
+
+    im = cv2.imread(fname2)
+    sol = np.load(solution)
+
+    bounds = [(0.5, 1.5), (0.1, np.pi - 0.1), (20, 70), (20, 200), (50, 200), (200, 255), (20, 80), (80, 150)]
+    curr_idx = 0
+    curr_min = 10**100
+
+    lin_interp = lambda idx, nb_steps : bounds[idx][0] + nb_steps * (bounds[idx][1] - bounds[idx][0])/10
+    for iter1 in range(10000):
+        rho_idx, theta_idx, threshold_idx, line_len_idx, gray_range_d, gray_range_u, canny_range_d, canny_range_u = np.random.random_integers(0, 10, 8)
+
+        rho = lin_interp(0, rho_idx)
+        theta = lin_interp(1, theta_idx)
+        threshold = lin_interp(2, threshold_idx)
+        line_len = lin_interp(3, line_len_idx)
+        gray_d = lin_interp(4, gray_range_d)
+        gray_u = lin_interp(5, gray_range_u)
+        canny_d = lin_interp(6, canny_range_d)
+        canny_u = lin_interp(7, canny_range_u)
+        res = calibrate_pic([rho, theta, threshold, line_len, gray_d, gray_u, canny_d, canny_u], im, sol, roi_vertices=rois)
+        if res < curr_min:
+            curr_min = res
+            curr_sol = (rho, theta, threshold, line_len, gray_d, gray_u, canny_d, canny_u)
+            print(curr_min, curr_sol)
+        curr_idx += 1
+        # print(curr_idx, res, curr_min,  rho, theta, threshold, line_len, gray_d, gray_u, canny_d, canny_u)
+
+    return res, curr_sol
+
+    #from scipy.optimize import minimize
+    # res = minimize( lambda p: calibrate_pic(p, im, sol, roi_vertices=rois)
+    #               , np.array([1., np.pi/180., 50, 50, 150, 255, 50, 100])
+    #               , bounds=bounds
+    #               , )
+
+k1 = fname5()
 
 # fname1(rois = [[100, 540], [515, 320], [450, 320], [900, 540]], fname3 = '/home/brumen/tmp/Simple-Lane-Detection/test_images/solidWhiteCurve.jpg')
 # im, cl, im2 = fname1(rois = [[100, 540], [450, 320], [515, 320], [900, 540]  ], fname3 = '/home/brumen/tmp/Simple-Lane-Detection/test_images/solidWhiteCurve.jpg')

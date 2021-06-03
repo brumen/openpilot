@@ -73,7 +73,7 @@ model, train_gen, valid_gen = get_model(base_dir = BASE_DIR3, train_percentage=0
 model.fit(train_gen)
 
 # prediction
-input_1, result_1 = valid_gen[0]
+input_1, result_1 = next(valid_gen)
 model_1 = model.predict(input_1)  # this is a collection of 32 images, since batch size is 32
 
 # model_1 and result_1 should be close

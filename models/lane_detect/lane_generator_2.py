@@ -3,7 +3,7 @@ import numpy as np
 import cv2
 import logging
 
-from typing  import Union, Tuple, List
+from typing  import Union, Tuple
 
 from openpilot.models.lane_detect.construct_lanes import HoughLanesImage
 from openpilot.models.lane_detect.lane_generate_cu import ImageAndLaneMarkingsCULane
@@ -46,10 +46,9 @@ class LaneGeneratorBase(ImageAndLaneMarkingsCULane):
         """ Shows the movie from images.
         """
 
-        for batch_set in self:
-
-            for X, y in batch_set:
-                cv2.imshow('lines2', cv2.addWeighted(X, 0.6, y, 0.8, 0))
+        for X, y in self:  # X of size (batch_size, image_X, image_y, nb_channels), same for y
+            for X_frame, y_frame in zip(X, y):  # unpack along the first axis, which is the batch size
+                cv2.imshow('lines2', cv2.addWeighted(X_frame, 0.6, y_frame, 0.8, 0))
                 cv2.waitKey(100)  # IMPORTANT LINE, DO NOT DELETE
 
     def __next__(self) -> Tuple[np.ndarray, np.ndarray]:
@@ -160,6 +159,45 @@ class LaneGeneratorCU(LaneGeneratorBase):
         return cv2.resize(line_image.astype(np.uint8), (int(nb_cols * self.scale_image), int(nb_rows * self.scale_image) ) )
 
 
+class LaneGeneratorCUHough(LaneGeneratorBase):
+
+    def _process_X(self, orig_image) -> Union[None, np.ndarray]:
+        """
+
+        :param orig_image: original image of shape (image_x, image_y, nb_channels)
+        :returns: image of the same shape
+        """
+
+        if orig_image is None:
+            return None
+
+        roi_vertex = [(200, 500), (600, 250), (1000, 250), (1400, 500)]
+        cl = HoughLanesImage( orig_image, roi_vertex)
+
+        hough_lines = cl.show_lines(self.image_shape(orig_image)).astype(np.uint8) * 255
+        hough_lines = cv2.cvtColor(hough_lines, cv2.COLOR_GRAY2RGB)
+
+        lane_image = cv2.addWeighted(orig_image, 0.6, hough_lines, 0.8, 0)
+        # adding color
+
+        if self.scale_image is None:
+            return np.array(lane_image, dtype=np.uint8)
+
+        # resize the image
+        nb_rows, nb_cols = self.image_shape(lane_image)
+        return cv2.resize( lane_image, (int(nb_cols * self.scale_image), int(nb_rows * self.scale_image) ) )
+
+    def show_movie(self):
+        """ Shows the movie from images.
+        """
+
+        for X, _ in self:  # X of size (batch_size, image_X, image_y, nb_channels), same for y
+            for X_frame in X:  # unpack along the first axis, which is the batch size
+                cv2.imshow('Hough', X_frame)
+                cv2.waitKey(100)  # IMPORTANT LINE, DO NOT REMOVE
+
+
+
 def example_2():
     # new_image_size = (590, 1640, 3)
     scale_size = 1.
@@ -191,10 +229,31 @@ def example_1():
                                      , scale_image=scale_size
                                      , batch_size=batch_size )
 
-    for x in train_generator:
-        print(x)
+#    for x in train_generator:
+#        print(x)
 
 
     train_generator.show_movie()
 
-#example_1()
+def example_3():
+    # new_image_size = (590, 1640, 3)
+    scale_size = 1.
+    batch_size = 32
+    train_percentage = 0.8
+
+    from openpilot.models.lane_detect.lane_config import BASE_BASE
+
+    train_generator = LaneGeneratorCUHough( BASE_BASE
+                                     , to_train = True
+                                     , train_percentage  = train_percentage
+                                     , scale_image=scale_size
+                                     , batch_size=batch_size )
+
+#    for x in train_generator:
+#        print(x)
+
+
+    train_generator.show_movie()
+
+
+example_3()
