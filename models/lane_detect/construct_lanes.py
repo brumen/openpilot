@@ -95,14 +95,16 @@ class LanesBase:
         """ Generates the image from one given spline -
 
         :param spline: function (of y) representing x-s of the points.
+        :param x_min_max: minimum and maximum of the x coordinates.
+        :param y_min_max: minimum and max. of the y coordinates.
         :param image_size: size of the image (first coord height), second coord width
         :param pixel_tol: tolerance of pixel from the line mark
         """
 
-        # x_min, x_max = x_min_max
-        # y_min, y_max = y_min_max
+        x_min, x_max = x_min_max
+        y_min, y_max = y_min_max
 
-        line_x_coords = np.array([spline(y_coord)
+        line_x_coords = np.array([spline(y_coord) if y_min <= y_coord <= y_max else np.inf
                                   for y_coord in range(image_size[0])]).reshape((image_size[0], 1))
 
         return np.abs(line_x_coords - np.arange(image_size[1])) < pixel_tol
@@ -490,7 +492,7 @@ def fname5(image_nb = '00150', dir_nb = '05151640_0419', rois = [(200, 500), (73
     #               , bounds=bounds
     #               , )
 
-k1 = fname5()
+# k1 = fname5()
 
 # fname1(rois = [[100, 540], [515, 320], [450, 320], [900, 540]], fname3 = '/home/brumen/tmp/Simple-Lane-Detection/test_images/solidWhiteCurve.jpg')
 # im, cl, im2 = fname1(rois = [[100, 540], [450, 320], [515, 320], [900, 540]  ], fname3 = '/home/brumen/tmp/Simple-Lane-Detection/test_images/solidWhiteCurve.jpg')
