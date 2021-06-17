@@ -26,7 +26,7 @@ class ImageGenerateBase:
         self.base_dir = base_dir
 
     @staticmethod
-    def __compare_fnames(fname : str) -> int:
+    def _compare_fnames(fname : str) -> int:
         """ Compares two filenames.
 
         :param fname: filename to compute the key on.
@@ -52,7 +52,7 @@ class ImageGenerateBase:
         file_nb, _ = file_name.split('.')
 
         if os.path.exists(os.path.join(file_directory, f'{file_nb}.lines.txt')):
-            return file_nb
+            return file_name
 
         return None
 
@@ -62,47 +62,21 @@ class ImageGenerateBase:
 
         for directory, dir_names, dir_files in os.walk(self.base_dir, followlinks=True):
             selected_files = filter(lambda file_name: self._file_selection(file_name, directory), dir_files)
-            for dir_file in sorted(selected_files, key=self.__compare_fnames):
-                file_nb = self._file_selection(dir_file, directory)
-                if file_nb is not None:
-                    yield directory, file_nb
 
-    def _image_name_from_idx(self, idx : Tuple[str, str]) -> str:
-        """ Constructs a file name from index.
+            for dir_file in sorted(selected_files, key=self._compare_fnames):
+                file_name = self._file_selection(dir_file, directory)
+                if file_name is not None:
+                    yield os.path.join(directory, file_name)
 
-        :param idx: index, a tuple of folder name, and image name.
-        """
-
-        dir_name, image_idx = idx
-
-        return f'{dir_name}/{image_idx}.jpg'
-
-    def _image_from_idx(self, idx: Tuple[str, str]) -> np.ndarray:
-        """ Returns the image associated w/ the index idx.
-
-        :param idx: index for which image we want to retrieve.
-        """
-
-        return cv2.imread(self._image_name_from_idx(idx))
-
-    def show_movie(self):
+    def show_movie(self, wait_between_frames : int = 100 ):
         """ Shows the movie from the images in the folder.
         """
 
-        for dir_name_file_nb in self:  # this is the iterator, dir_name_file_nb is a tuple (directory, file_name)
-            logger.info(f'Displaying file {dir_name_file_nb}')
-            cv2.imshow('Video', self._image_from_idx(dir_name_file_nb) )
-            cv2.waitKey(100)  # IMPORTANT LINE, _DO NOT DELETE_
-
-    @staticmethod
-    def image_shape(image : np.ndarray) -> Tuple[int, int]:
-        """ Returns the shape of the image.
-        """
-
-        return image.shape[0], image.shape[1]
-
-    def _image_shape(self, idx) -> Tuple[int, int]:
-        return self.image_shape(self._image_from_idx(idx))
+        for dir_name_file_name in self:  # this is the iterator, dir_name_file_nb is a tuple (directory, file_name)
+            logger.info(f'Displaying file {dir_name_file_name}')
+            orig_image = cv2.imread(dir_name_file_name)
+            cv2.imshow('Video', orig_image)
+            cv2.waitKey(wait_between_frames)  # IMPORTANT LINE, _DO NOT DELETE_
 
 
 def main():

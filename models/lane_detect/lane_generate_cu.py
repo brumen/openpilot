@@ -3,7 +3,7 @@ import numpy as np
 import logging
 import cv2
 
-from typing     import Tuple
+from typing     import Tuple, Union
 
 # from openpilot.models.lane_detect.hough_lines        import HoughLanesImage
 from openpilot.models.lane_detect.lane_generate_base import ImageGenerateBase
@@ -41,23 +41,18 @@ class ImageAndLaneMarkingsCULane(ImageGenerateBase):
         self.__train_lanes_obj = self.train_lanes_class(self.base_dir)
         return self.__train_lanes_obj
 
-    def train_lanes(self, idx : Tuple[str, str]) -> np.ndarray:
-        """ Constructs a marked lane image (array) name from index.
+    def show_movie_with_lanes(self, wait_btw_frames : int =100):
+        """ Shows the movie with lanes superimposed.
 
-        :param idx: tuple of folder dir/filename.
+        :param wait_btw_frames: wait time between frames in milliseconds.
         """
 
-        folder, fname = idx
-        return self.train_lanes_obj.new_image(os.path.join(folder, f'{fname}.jpg'), self._image_shape(idx))
-
-    def show_movie_with_lanes(self):
-
-        for dir_name_file_nb in self:  # this is the iterator, dir_name_file_nb is a tuple (directory, file_name)
-            logger.info(f'Displaying file {dir_name_file_nb}')
-            orig_image = self._image_from_idx(dir_name_file_nb)
-            lane_image = cv2.cvtColor(self.train_lanes_obj.new_image(dir_name_file_nb, orig_image.shape[:2]) * 255, cv2.COLOR_GRAY2RGB)
+        for dir_name_file_name in self:  # this is the iterator, dir_name_file_nb is a tuple (directory, file_name)
+            logger.info(f'Displaying file {dir_name_file_name}')
+            orig_image = cv2.imread(dir_name_file_name)
+            lane_image = cv2.cvtColor(self.train_lanes_obj.new_image(dir_name_file_name, orig_image.shape[:2]).astype(np.uint8) * 255, cv2.COLOR_GRAY2RGB)
             cv2.imshow('lines', cv2.addWeighted(orig_image, 0.6, lane_image, 0.8, 0))
-            cv2.waitKey(100)
+            cv2.waitKey(wait_btw_frames)
 
     # def _roi_region(self) -> List[Tuple[int, int]]:
     #     """ Generates the roi region for the image.
@@ -84,3 +79,57 @@ class ImageAndLaneMarkingsTUSimple(ImageAndLaneMarkingsCULane):
     @property
     def train_lanes_class(self):
         return TrainLanesTuSimple
+
+    @staticmethod
+    def _compare_fnames(fname : str) -> int:
+        """ Comparator: Compares two filenames.
+
+        :param fname: filename to compute the key on.
+        :returns: key of the filename, which is just the integer.
+        """
+
+        fname_nb, _ = fname.split('.')
+
+        return int(fname_nb)
+
+    def _file_selection(self, file_name : str, file_directory : str) -> Union[None, str]:
+        """ Selects whether the file is included in the walk.
+
+        :param file_name: file name considered for inclusion
+        :param file_directory: directory where the file is located.
+        :returns: file_nb if the file is considered, otherwise None
+        """
+
+        if 'jpg' in file_name:
+            return file_name
+
+        # .jpg not in the file name, return None
+        return None
+
+    def show_movie_with_lanes(self, wait_btw_frames : int =100):
+        """ Shows the movie with lanes superimposed.
+
+        :param wait_btw_frames: wait time between frames in milliseconds.
+        """
+
+        for dir_name_file_name in self:  # this is the iterator, dir_name_file_nb is a tuple (directory, file_name)
+            logger.info(f'Displaying file {dir_name_file_name}')
+            orig_image = cv2.imread(dir_name_file_name)
+            lane_image = cv2.cvtColor(self.train_lanes_obj.new_image(dir_name_file_name.replace(self.base_dir, ''), orig_image.shape[:2]).astype(np.uint8) * 255, cv2.COLOR_GRAY2RGB)
+            cv2.imshow('lines', cv2.addWeighted(orig_image, 0.6, lane_image, 0.8, 0))
+            cv2.waitKey(wait_btw_frames)
+
+
+def main_1():
+    cu_dir = '/home/brumen/data/openpilot/CULane/drive'
+    i1 = ImageAndLaneMarkingsCULane(cu_dir)
+    i1.show_movie_with_lanes()
+
+
+def main_2():
+    tu_dir = '/home/brumen/data/openpilot/tusimple/clips'
+    i1 = ImageAndLaneMarkingsTUSimple(tu_dir)
+    i1.show_movie_with_lanes()
+
+
+# main_2()

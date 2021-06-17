@@ -82,6 +82,7 @@ class TrainLanesCULane:
     def _lane_path(self, jpg_path : str) -> str:
         """ Constructs the lane path file name from jpg path
 
+        :param jpg_path:
         """
 
         return jpg_path.replace('.jpg', '.lines.txt')
@@ -158,13 +159,17 @@ class TrainLanesTuSimple(TrainLanesCULane):
     def _lane_path(self, jpg_path : str) -> str:
         """ Constructs the lane path file name from jpg path
 
+        :param jpg_path: path to the jpg file (under the base_dir)
+        :returns: path to the lane file (if needed)
         """
+
         return jpg_path
 
     def _get_lines(self, jpg_path : str) -> List[List[Tuple[float, float]]]:
         """ Gets the lanes for the jpg file.
 
         :param jpg_path: lane description path, in this case the same as the jpg_path 0313-1/23700/20.jpg
+        :returns: list of lanes in the form of list of tuples of y,x
         """
 
         return self.lane_idx.get( jpg_path )
@@ -266,4 +271,4 @@ def example_2():
     tu.superimpose_img('0313-1/480/20.jpg')
 
 
-example_2()
+# example_2()
