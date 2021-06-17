@@ -7,9 +7,8 @@ import json
 
 from typing    import List, Tuple, Dict
 from functools import lru_cache
-from matplotlib import pyplot as plt
 
-from openpilot.models.lane_detect.construct_lanes import LanesBase
+from openpilot.models.lane_detect.base_lines import LanesBase
 
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
@@ -119,9 +118,8 @@ class TrainLanesCULane:
         loaded_image = self.new_image(jpg_path, image_size, pixel_tol=pixel_tol)
         tsf_image = cv2.cvtColor(loaded_image.astype(np.uint8) * 255, cv2.COLOR_GRAY2BGR)
 
-        # TOOD: CHANGE THIS INTO cv2
-        plt.imshow(tsf_image)
-        plt.show()
+        cv2.imshow('CULane_image', tsf_image)
+        cv2.waitKey(100)
 
     def superimpose_img(self, jpg_path : str, pixel_tol : int = 10):
         orig_image = cv2.imread(os.path.join(self.base_dir, jpg_path))
@@ -129,8 +127,8 @@ class TrainLanesCULane:
         lane_img_tsf = cv2.cvtColor(lane_img.astype(np.uint8) * 255, cv2.COLOR_GRAY2BGR)
         combined = cv2.addWeighted(orig_image, 0.6, lane_img_tsf, 0.8, 0)
 
-        plt.imshow(combined)
-        plt.show()
+        cv2.imshow('CULane_superimpose', combined)
+        cv2.waitKey(100)
 
 
 class TrainLanesTuSimple(TrainLanesCULane):
@@ -250,13 +248,22 @@ class TrainLanesTuSimple(TrainLanesCULane):
         return lane_indices
 
 
-# examples
-# culane = TrainLanesCULane()
-# k3 = culane.new_image('06031737_0895.MP4/00000.jpg', (590, 1640), 10)
-# culane.show_image('06031737_0895.MP4/00000.jpg', (590, 1640), 10)
-# culane.superimpose_img('06031737_0895.MP4/00000.jpg')
-#
-# tu = TrainLanesTuSimple()
-# k1 = tu.new_image('0313-1/21060/1.jpg', (720, 1280))
-# tu.show_image('0313-1/21060/1.jpg', (720, 1280))
-# tu.superimpose_img('0313-1/21060/1.jpg')
+def example_1():
+    culane = TrainLanesCULane()
+    k3 = culane.new_image('06031737_0895.MP4/00000.jpg', (590, 1640), 10)
+    culane.show_image('06031737_0895.MP4/00000.jpg', (590, 1640), 10)
+    culane.superimpose_img('06031737_0895.MP4/00000.jpg')
+
+
+def example_2():
+    tu = TrainLanesTuSimple()
+    #k1 = tu.new_image('0313-1/21060/1.jpg', (720, 1280))
+    #tu.show_image('0313-1/21060/1.jpg', (720, 1280))
+    #tu.superimpose_img('0313-1/21060/1.jpg')
+
+    k1 = tu.new_image('0313-1/480/20.jpg', (720, 1280))
+    tu.show_image('0313-1/480/20.jpg', (720, 1280))
+    tu.superimpose_img('0313-1/480/20.jpg')
+
+
+example_2()

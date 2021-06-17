@@ -5,7 +5,7 @@ import logging
 
 from typing  import Union, Tuple
 
-from openpilot.models.lane_detect.construct_lanes import HoughLanesImage
+from openpilot.models.lane_detect.hough_lines      import HoughLanesImage
 from openpilot.models.lane_detect.lane_generate_cu import ImageAndLaneMarkingsCULane
 
 
@@ -18,11 +18,11 @@ class LaneGeneratorBase(ImageAndLaneMarkingsCULane):
     """
 
     def __init__(self
-                 , base_dir         : str
-                 , batch_size       : int                = 32
-                 , train_percentage : float              = .8
-                 , to_train         : bool               = True
-                 , scale_image      : Union[None, float] = None ):
+                , base_dir         : str
+                , batch_size       : int                = 32
+                , train_percentage : float              = .8
+                , to_train         : bool               = True
+                , scale_image      : Union[None, float] = None ):
         """
 
         :param base_dir: base dir where the files are located.
@@ -99,17 +99,9 @@ class LaneGeneratorBase(ImageAndLaneMarkingsCULane):
         logger.info(f'Loading image {image_id}')
 
         orig_image = self._image_from_idx(image_id)
+        line_image = self.train_lanes_obj.new_image(os.path.join(*image_id), orig_image.shape[:2])
 
-        # check if the pre-processed image is saved
-        line_image_name = self._precomputed_lane_file(image_id)
-
-        if os.path.isfile(line_image_name):  # preprocessed image is saved
-            line_image = np.load(line_image_name)
-
-        else:
-            logger.info(f'Generating train lane image {line_image_name}')
-            line_image = self.train_lanes(image_id)
-
+        # X is the original image, y is the marked lane image
         X = self._process_X(orig_image)
         y = self._process_y(line_image)
 
