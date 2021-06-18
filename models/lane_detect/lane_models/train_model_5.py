@@ -4,7 +4,7 @@ import logging
 logging.basicConfig(level=logging.INFO)
 
 from openpilot.models.lane_detect.lane_config       import BASE_BASE, BASE_DIR3
-from openpilot.models.lane_detect.lane_generator_2    import LaneGeneratorCU
+from openpilot.models.lane_detect.lane_generator    import LaneGeneratorCU
 from openpilot.models.lane_detect.lane_generator_ts import LaneGeneratorTS
 
 from openpilot.models.lane_detect.lane_models.model_5    import lane_model_5
