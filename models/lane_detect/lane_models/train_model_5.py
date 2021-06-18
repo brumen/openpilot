@@ -76,13 +76,3 @@ model.fit(train_gen)
 # prediction
 #input_1, result_1 = next(valid_gen)
 #model_1 = model.predict(input_1)  # this is a collection of 32 images, since batch size is 32
-
-# model_1 and result_1 should be close
-# from openpilot.models.lane_detect.extract_coords import show_image
-
-#from matplotlib import pyplot as plt
-#plt.imshow(result_1[0])
-#plt.show()
-
-#plt.imshow(model_1[0][:,:,0])
-#plt.show()

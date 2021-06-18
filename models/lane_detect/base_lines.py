@@ -111,12 +111,13 @@ class LanesBase:
     def show_line( self
                  , marked_line : List[Tuple[float, float]]
                  , image_size  : Tuple[int, int]
-                 , pixel_tol   : int = 10 ):
+                 , pixel_tol   : int = 10 ) -> np.ndarray:
         """ generates the image for the particular marked_line (taken mostly from self.lines)
 
         :param marked_line: line to be drawn
         :param image_size: image size to be generated.
         :param pixel_tol: pixel tolerance when drawing a line.
+        :returns: 2 dimensional array of bools.
         """
 
         # common usage
@@ -147,7 +148,7 @@ class LanesBase:
 
         :param image_size: size of the image (y_size, x_size), that is the nb. of rows comes first.
         :param pixel_tol: pixel tolerance from the line
-        :returns: image constructed from the lines.
+        :returns: image constructed from the lines, a 2 dimensional array of bools
         """
 
         if not self.lines:
