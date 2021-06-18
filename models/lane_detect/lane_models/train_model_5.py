@@ -3,9 +3,10 @@ import logging
 
 logging.basicConfig(level=logging.INFO)
 
-from openpilot.models.lane_detect.lane_config       import BASE_BASE, BASE_DIR3
-from openpilot.models.lane_detect.lane_generator    import LaneGeneratorCU
-from openpilot.models.lane_detect.lane_generator_ts import LaneGeneratorTS
+from openpilot.models.lane_detect.lane_config       import BASE_CU, BASE_TU
+from openpilot.models.lane_detect.lane_generator    import LaneGeneratorCU, LaneGeneratorTU
+from openpilot.models.lane_detect.lane_generator_ts import LaneGeneratorCUTS, LaneGeneratorTUTS
+from openpilot.models.lane_detect.lane_models.lane_generator_tsf import LaneGeneratorCUShrink, LaneGeneratorTUShrink, LaneGeneratorTUTSShrink, LaneGeneratorCUTSShrink
 
 from openpilot.models.lane_detect.lane_models.model_5    import lane_model_5
 from openpilot.models.lane_detect.lane_models.model_5_ts import model_5_ts
@@ -14,19 +15,19 @@ from openpilot.models.lane_detect.lane_models.model_base import model_from_layer
 logger = logging.getLogger(__name__)
 
 
-def get_model(base_dir = BASE_BASE, scale_size = 0.2, train_percentage = 0.003, batch_size=32):
+def get_model(base_dir = BASE_CU, scale_size = 0.2, train_percentage = 0.003, batch_size=32, lane_gen_class = LaneGeneratorCUShrink):
     new_image_size = (int(590 * scale_size), int(1640 * scale_size), 3)
 
-    train_generator = LaneGeneratorCU(base_dir
-                                    , to_train = True
-                                    , train_percentage  = train_percentage
-                                    , scale_image=scale_size
-                                    , batch_size=batch_size)
-    valid_generator = LaneGeneratorCU(base_dir
-                                    , to_train = False
-                                    , train_percentage = 1. - train_percentage
-                                    , scale_image = scale_size
-                                    , batch_size = batch_size)
+    train_generator = lane_gen_class( base_dir
+                                           , to_train = True
+                                           , train_percentage  = train_percentage
+                                           , batch_size=batch_size
+                                           , scale_img=scale_size )
+    valid_generator = lane_gen_class( base_dir
+                                           , to_train = False
+                                           , train_percentage = 1. - train_percentage
+                                           , batch_size = batch_size
+                                           , scale_img=scale_size )
 
     model = lane_model_5( new_image_size )
 
@@ -38,23 +39,23 @@ def get_model(base_dir = BASE_BASE, scale_size = 0.2, train_percentage = 0.003, 
     return model, train_generator, valid_generator
 
 
-def get_model_ts(base_dir = BASE_BASE, scale_size = 0.2, train_percentage = 0.003, batch_size=32):
+def get_model_ts(base_dir = BASE_CU, scale_size = 0.2, train_percentage = 0.003, batch_size=32, lane_gen_class = LaneGeneratorCUTSShrink):
     new_image_size = (int(590 * scale_size), int(1640 * scale_size), 3)
     new_image_size = (5, int(590 * scale_size), int(1640 * scale_size), 3)
 
-    train_generator = LaneGeneratorTS( base_dir
+    train_generator = lane_gen_class( base_dir
                                      , to_train = True
                                      , train_percentage  = train_percentage
-                                     , scale_image=scale_size
                                      , batch_size=batch_size
-                                     , nb_time_steps=5 )
+                                     , nb_time_steps=5
+                                      , scale_img= scale_size)
 
-    valid_generator = LaneGeneratorTS( base_dir
+    valid_generator = lane_gen_class( base_dir
                                      , to_train = False
                                      , train_percentage = 1. - train_percentage
-                                     , scale_image = scale_size
                                      , batch_size = batch_size
-                                     , nb_time_steps= 5)
+                                     , nb_time_steps= 5
+                                      , scale_img=scale_size)
 
     # model = lane_model_1( (590, 1640, 3) )
     # model = lane_model_5( new_image_size )
@@ -69,12 +70,12 @@ def get_model_ts(base_dir = BASE_BASE, scale_size = 0.2, train_percentage = 0.00
 
 
 # can be replaced w/ get_model
-model, train_gen, valid_gen = get_model(base_dir = BASE_DIR3, train_percentage=0.1, batch_size=3)
+model, train_gen, valid_gen = get_model_ts( train_percentage=0.1, batch_size=3)
 model.fit(train_gen)
 
 # prediction
-input_1, result_1 = next(valid_gen)
-model_1 = model.predict(input_1)  # this is a collection of 32 images, since batch size is 32
+#input_1, result_1 = next(valid_gen)
+#model_1 = model.predict(input_1)  # this is a collection of 32 images, since batch size is 32
 
 # model_1 and result_1 should be close
 # from openpilot.models.lane_detect.extract_coords import show_image

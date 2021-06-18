@@ -35,6 +35,8 @@ class LaneGeneratorCU:
         self.train_percentage = train_percentage
         self.to_train         = to_train
 
+        self.__stored_file_iterator = None
+
     @staticmethod
     def _compare_fnames(fname : str) -> int:
         """ Comparator comparing 2 file names, to be ordered and displayed correctly.
@@ -70,33 +72,35 @@ class LaneGeneratorCU:
         """ Getting all the files from the base dir in ascending order.
         """
 
-        for directory, dir_names, dir_files in os.walk(self.base_dir, followlinks=True):
-            selected_files = filter(lambda file_name: self._file_selection(file_name, directory), dir_files)
+        if self.__stored_file_iterator:
+            return self.__stored_file_iterator
 
-            for dir_file in sorted(selected_files, key=self._compare_fnames):
-                file_name = self._file_selection(dir_file, directory)
-                if file_name is not None:
-                    yield os.path.join(directory, file_name)
+        # iterator written quite awkwardly
+        self.__stored_file_iterator = ( os.path.join(directory, self._file_selection(dir_file, directory))
+            for directory, dir_names, dir_files in os.walk(self.base_dir, followlinks=True)
+                for dir_file in sorted(filter(lambda file_name: self._file_selection(file_name, directory), dir_files), key=self._compare_fnames)
+                    if self._file_selection(dir_file, directory) is not None
+        )
 
-    def __iter__(self):
-        """ Iterator over the frames of the movie.
-        """
+        return self.__stored_file_iterator
+
+    def __next__(self):
 
         curr_idx = 0
         X_list = []
         y_list = []
 
-        for curr_filename in self._file_iterator():
-            if curr_idx < self.batch_size:
-                X, y = self._generate_one_Xy(curr_filename)
-                X_list.append(X)
-                y_list.append(y)
-                curr_idx += 1
-            else:
-                yield np.array(X_list), np.array(y_list)
-                curr_idx = 0
-                X_list = []
-                y_list = []
+        while curr_idx < self.batch_size:
+            curr_filename = next(self._file_iterator())
+            X, y = self._generate_one_Xy(curr_filename)
+            X_list.append(X)
+            y_list.append(y)
+            curr_idx += 1
+
+        return np.array(X_list), np.array(y_list)
+
+    def __iter__(self):
+        return self
 
     def show_movie_with_lanes(self, wait_between_frames : int = 100 ):
         """ Shows the movie from images.
@@ -136,7 +140,7 @@ class LaneGeneratorCU:
     def _generate_one_Xy(self, curr_filename : str) -> Tuple[np.ndarray, np.ndarray]:
         """ Generates a tuple of original image (X) and the target image (y) for image_id.
 
-        :param image_id: tuple of directory, and the filename.
+        :param curr_filename: current filename of the jpg image from which X (the image) and the desired lanes (y) are generated.
         :returns: tuple of original (possible processed image), and the target (line image).
         """
 
@@ -247,7 +251,7 @@ def example_1():
 #    for x in train_generator:
 #        print(x)
 
-    train_generator.show_movie()
+    train_generator.show_movie_with_lanes()
 
 
-# example_2()
+# example_1()
