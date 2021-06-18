@@ -8,48 +8,47 @@ logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
 
-class LaneGeneratorTSMixin(LaneGeneratorCU):
+class LaneGeneratorTSMixin:  # (LaneGeneratorCU):
     """ Generates a time series of lanes.
     """
-
-
-    # def __next__(self) -> Tuple[np.ndarray, np.ndarray]:
-    #     """ Get the next self.batch_size images
-    #
-    #     :returns: list of tuples of X and y image
-    #     """
-    #
-    #     curr_ts = 0
-    #     X_list = []
-    #     y_list = []
-    #
-    #     while curr_ts < self.batch_size_ts:
-    #         X, y = super().__next__()
-    #         X_list.append(X)
-    #         y_list.append(y)
-    #         curr_ts += 1
-    #
-    #     return np.array(X_list), np.array(y_list)
 
     def __iter__(self):
         """ Iterator over the frames of the movie.
         """
 
-        curr_idx = 0
+        curr_idx_batch = 0
+        curr_time_step = 0
         X_list = []
         y_list = []
+        X_list_ts = []
+        y_list_ts = []
 
         for curr_filename in self._file_iterator():
-            if curr_idx < self.batch_size_ts:
-                X, y = self._generate_one_Xy(curr_filename)
-                X_list.append(X)
-                y_list.append(y)
-                curr_idx += 1
+
+            if curr_time_step < self.nb_time_steps:
+
+                if curr_idx_batch < self.batch_size_ts:
+                    X, y = self._generate_one_Xy(curr_filename)
+                    X_list_ts.append(X)
+                    y_list_ts.append(y)
+                    curr_idx_batch += 1
+
+                else:
+                    X_list.append(np.array(X_list_ts))
+                    y_list.append(np.array(y_list_ts))
+                    curr_idx_batch = 0
+                    curr_time_step += 1
+                    X_list_ts = []
+                    y_list_ts = []
+
             else:
                 yield np.array(X_list), np.array(y_list)
-                curr_idx = 0
                 X_list = []
                 y_list = []
+                X_list_ts = []
+                y_list_ts = []
+                curr_idx_batch = 0
+                curr_time_step = 0
 
     def show_movie_with_lanes(self, wait_between_frames : int = 100 ):
         """ Shows the movie from images.
@@ -98,9 +97,9 @@ def example_1():
     batch_size = 32
     train_percentage = 0.8
 
-    from openpilot.models.lane_detect.lane_config import BASE_DIR
+    from openpilot.models.lane_detect.lane_config import BASE_CU
 
-    train_generator = LaneGeneratorCUTS( BASE_DIR
+    train_generator = LaneGeneratorCUTS( BASE_CU
                                        , to_train = True
                                        , train_percentage  = train_percentage
                                        , batch_size=batch_size )
@@ -116,9 +115,9 @@ def example_2():
     batch_size = 32
     train_percentage = 0.8
 
-    from openpilot.models.lane_detect.lane_config import BASE_DIR
+    from openpilot.models.lane_detect.lane_config import BASE_TU
 
-    train_generator = LaneGeneratorTUTS( BASE_DIR  # TODO: THIS IS WRONG
+    train_generator = LaneGeneratorTUTS( BASE_TU
                                        , to_train = True
                                        , train_percentage  = train_percentage
                                        , batch_size=batch_size )
@@ -126,6 +125,6 @@ def example_2():
 #    for x in train_generator:
 #        print(x)
 
-    train_generator.show_movie()
+    train_generator.show_movie_with_lanes()
 
-# example_1()
+example_2()

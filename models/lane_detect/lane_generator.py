@@ -213,6 +213,7 @@ class LaneGeneratorTU(LaneGeneratorCU):
 
         return X, y
 
+
 # examples
 def example_2():
     # new_image_size = (590, 1640, 3)
@@ -220,12 +221,12 @@ def example_2():
     batch_size = 32
     train_percentage = 0.8
 
-    from openpilot.models.lane_detect.lane_config import BASE_BASE
+    from openpilot.models.lane_detect.lane_config import BASE_TU
 
-    train_generator = LaneGeneratorCU( BASE_BASE
-                                       , to_train = True
-                                       , train_percentage  = train_percentage
-                                       , batch_size=batch_size )
+    train_generator = LaneGeneratorTU( BASE_TU
+                                     , to_train = True
+                                     , train_percentage  = train_percentage
+                                     , batch_size=batch_size )
 
     train_generator.show_movie_with_lanes()
 
@@ -236,9 +237,9 @@ def example_1():
     batch_size = 32
     train_percentage = 0.8
 
-    from openpilot.models.lane_detect.lane_config import BASE_BASE
+    from openpilot.models.lane_detect.lane_config import BASE_CU
 
-    train_generator = LaneGeneratorCU( BASE_BASE
+    train_generator = LaneGeneratorCU( BASE_CU
                                      , to_train = True
                                      , train_percentage  = train_percentage
                                      , batch_size=batch_size )
@@ -249,4 +250,4 @@ def example_1():
     train_generator.show_movie()
 
 
-example_2()
+# example_2()
