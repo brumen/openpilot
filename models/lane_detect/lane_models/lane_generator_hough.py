@@ -41,8 +41,6 @@ class LaneGeneratorTUHough(LaneGeneratorTUShrink):
         return cv2.addWeighted(first_img, 0.6, hough_img, 0.8, 0)
 
 
-
-
 # examples
 def example_2():
     # new_image_size = (590, 1640, 3)
