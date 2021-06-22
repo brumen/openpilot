@@ -103,7 +103,7 @@ class LanesBase:
         x_min, x_max = x_min_max
         y_min, y_max = y_min_max
 
-        line_x_coords = np.array([spline(y_coord) if y_min <= y_coord <= y_max else np.inf
+        line_x_coords = np.array([spline(y_coord)  # if y_min <= y_coord <= y_max else np.inf
                                   for y_coord in range(image_size[0])]).reshape((image_size[0], 1))
 
         return np.abs(line_x_coords - np.arange(image_size[1])) < pixel_tol
