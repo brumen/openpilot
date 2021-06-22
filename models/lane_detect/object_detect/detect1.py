@@ -13,39 +13,48 @@ class ObjectDetectMixin:
     """ Image shrink class.
     """
 
-    def _score_frame(self, frame, model):
+    def _score_frame(self, frame):
+        """ Scores the model
+
+        """
 
         device = 'cuda' if torch.cuda.is_available() else 'cpu'
-        model.to(device)
+        self.model.to(device)
         # frame = torch.tensor(frame)
         results = self.model(frame)
+
         labels = results.xyxyn[0][:, -1].cpu().numpy().astype(np.uint)
         cord = results.xyxyn[0][:, :-1].cpu().numpy()
 
         return labels, cord
 
     def _plot_boxes(self, results, frame):
+        """ Plots boxes around the detected stuff in the picture.
+
+        :param results:
+        :param frame:
+        :returns: a frame with the boxes drawn around detected objects.
+        """
 
         labels, cord = results
-        n = len(labels)
+        nb_labels = len(labels)
         x_shape, y_shape = frame.shape[1], frame.shape[0]
         bgr = (0, 255, 0)  # color of the box
         classes = self.model.names  # Get the name of label index
-        label_font = cv2.FONT_HERSHEY_SIMPLEX  # Font for the label.
 
-        for i in range(n):
-            row = cord[i]
-            # If score is less than 0.2 we avoid making a prediction.
-            if row[4] < 0.2:
+        for i in range(nb_labels):
+            x1, y1, x2, y2, prob = cord[i]
+
+            if prob < 0.2:  # If score is less than 0.2 we avoid making a prediction.
                 continue
-            x1 = int(row[0]*x_shape)
-            y1 = int(row[1]*y_shape)
 
-            x2 = int(row[2]*x_shape)
-            y2 = int(row[3]*y_shape)
+            x1 = int(x1 * x_shape)
+            y1 = int(y1 * y_shape)
+            x2 = int(x2 * x_shape)
+            y2 = int(y2 * y_shape)
 
             frame = cv2.rectangle( frame, (x1, y1), (x2, y2), bgr, 2)
-            frame = cv2.putText(frame, classes[labels[i]], (x1, y1), label_font, 0.9, bgr, 2)
+            frame = cv2.putText(frame, classes[labels[i]], (x1, y1), cv2.FONT_HERSHEY_SIMPLEX, 0.9, bgr, 2)
 
         return frame
 
@@ -53,9 +62,9 @@ class ObjectDetectMixin:
 
         first_tsf = super()._process_X(orig_image)
 
-        results = self._score_frame(first_tsf, self.model)
+        results = self._score_frame(first_tsf)
 
-        return  self._plot_boxes(results, first_tsf)
+        return self._plot_boxes(results, first_tsf)
 
 
 class ObjectDetectCU(ObjectDetectMixin, LaneGeneratorCU):
@@ -123,3 +132,6 @@ def example_1():
 
 
 example_2()
+
+# Testing lanenet
+# python tools/test_lanenet.py --weights_path /home/brumen/work/lanenet-net-detection/lanenet_model/pretrained_model/ --image_path /home/brumen/data/openpilot/tusimple/clips/0313-1/4080/10.jpg
