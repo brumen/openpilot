@@ -113,6 +113,17 @@ class LaneGeneratorCU:
                 cv2.imshow('lines2', cv2.addWeighted(X_frame, 0.6, y_frame, 0.8, 0))
                 cv2.waitKey(wait_between_frames)
 
+    def show_movie_with_lanes_cont(self, wait_between_frames : int = 100 ):
+        """ Shows the movie from images, making it more continuous, not so discontinuous.
+
+        :param wait_between_frames: waits between frames.
+        """
+
+        for curr_filename in self._file_iterator():
+            X, y = self._generate_one_Xy(curr_filename)
+            cv2.imshow('lines2', cv2.addWeighted(X, 0.6, y, 0.8, 0))
+            cv2.waitKey(wait_between_frames)
+
     def show_movie(self, wait_btw_frames : int =100):
         """ Shows the movie with lanes superimposed.
 
@@ -123,6 +134,17 @@ class LaneGeneratorCU:
             for X_frame in X:  # unpack along the first axis, which is the batch size
                 cv2.imshow('original', X_frame)
                 cv2.waitKey(wait_btw_frames)
+
+    def show_movie_cont(self, wait_btw_frames: int = 100):
+        """ Shows the movie with lanes superimposed.
+
+        :param wait_btw_frames: wait time between frames in milliseconds.
+        """
+
+        for curr_filename in self._file_iterator():
+            X, _ = self._generate_one_Xy(curr_filename)
+            cv2.imshow('original', X)
+            cv2.waitKey(wait_btw_frames)
 
     def _process_X(self, orig_image) -> Union[None, np.ndarray]:
         """ Processes the original image, this class doesnt do anything.
@@ -251,7 +273,7 @@ def example_1():
 #    for x in train_generator:
 #        print(x)
 
-    train_generator.show_movie_with_lanes()
+    train_generator.show_movie_with_lanes_cont()
 
 
 # example_1()

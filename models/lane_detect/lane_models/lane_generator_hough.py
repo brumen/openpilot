@@ -73,7 +73,8 @@ class YellowLineTU(LaneGeneratorTUHough):
 
         hough_img = cv2.cvtColor(cl.show_lines(yellow_line_img.shape[:2], pixel_tol=2).astype(np.uint8) * 255, cv2.COLOR_BGR2RGB)
 
-        return cv2.addWeighted(orig_image, 0.6, hough_img, 0.8, 0)
+        # return cv2.addWeighted(orig_image, 0.6, hough_img, 0.8, 0)
+        return cv2.addWeighted(yellow_line_img, 0.6, hough_img, 0.8, 0)
 
 
 class YellowLineTUSliders(YellowLineTU):
@@ -120,7 +121,6 @@ class YellowLineTUSliders(YellowLineTU):
         y6.set(255)
 
         canvas.mainloop()
-
 
 
 class RoadTU(YellowLineTU):
@@ -179,13 +179,13 @@ def example_2():
 
     from openpilot.models.lane_detect.lane_config import BASE_TU
 
-    train_generator = YellowLineTU( BASE_TU
+    train_generator = YellowLineTUSliders( BASE_TU
                                      , to_train = True
                                      , train_percentage  = train_percentage
                                      , batch_size=batch_size
                                             , scale_img= 1.)
 
-    train_generator.show_movie()
+    train_generator.show_movie_cont()
 
 
 def example_1():

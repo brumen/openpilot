@@ -20,6 +20,10 @@ class ImageShrinkMixin:
 
         first_tsf = super()._process_X(orig_image)
 
+        if self.scale_img == 1.:  # no shrinking:
+            return first_tsf
+
+        # scale the image
         new_width = int(first_tsf.shape[1] * self.scale_img)
         new_height = int(first_tsf.shape[0] * self.scale_img)
 
@@ -28,6 +32,10 @@ class ImageShrinkMixin:
     def _process_y(self, line_image):
         first_tsf = super()._process_y(line_image)
 
+        if self.scale_img == 1.:
+            return first_tsf
+
+        # rescale the image
         new_width = int(first_tsf.shape[1] * self.scale_img)
         new_height = int(first_tsf.shape[0] * self.scale_img)
 
