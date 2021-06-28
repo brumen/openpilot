@@ -30,7 +30,7 @@ class HoughLines(LanesBase):
         return self._hough_lines
 
     @staticmethod
-    def _lines_from_hough_lines(hough_lines):
+    def _lines_from_hough_lines_prev(hough_lines):
 
         lines_considered_left = {}
         lines_considered_right = {}
@@ -81,6 +81,62 @@ class HoughLines(LanesBase):
         complete_lines.update(lines_considered_right)
 
         return [LanesBase.remove_duplicates(line) for line in complete_lines.values()]
+
+    @staticmethod
+    def _lines_from_hough_lines(hough_lines):
+
+        lines_considered_left = {}
+        lines_considered_right = {}
+
+        hough_lines_sorted = sorted( hough_lines
+                                   , key=lambda x: np.sqrt((x[0][2] - x[0][0])**2 + (x[0][3] - x[0][1])**2)
+                                   , reverse=True)  # longest at the beginning
+
+        # TODO: THIS SHOULD BE BETTER WRITTEN
+        if hough_lines is not None:
+            for hough_line in hough_lines_sorted:
+                x1, y1, x2, y2 = hough_line[0]
+
+                # case x1 == x2
+                if x1 == x2:
+                    if y2 >= y1:  # positive inf slope
+                        lines_considered_left[np.inf] = [(x1, y1), (x2, y2)]
+                    else:
+                        lines_considered_right[np.inf] = [(x1, y1), (x2, y2)]
+
+                    continue
+
+                # x2 != x1
+                line_slope = (y2 - y1)/(x2 - x1)
+
+                if np.abs(line_slope) > 0.75:
+                    if line_slope <= 0:
+                        lines_considered_left[line_slope] = [(x1, y1), (x2, y2)]
+
+                    if line_slope > 0:
+                        lines_considered_right[line_slope] = [(x1, y1), (x2, y2)]
+
+        if lines_considered_left:
+            new_lines_left = []
+            for _, line_xys in lines_considered_left.items():
+                new_lines_left.extend(line_xys)
+
+        else:
+            new_lines_left = []
+
+        if lines_considered_right:
+            new_lines_right = []
+            for _, line_xys in lines_considered_right.items():
+                new_lines_right.extend(line_xys)
+
+        else:
+            new_lines_right = []
+
+        complete_lines = [new_lines_left, new_lines_right]
+
+        # TODO: HERE A LOT MORE TO DO.
+
+        return [LanesBase.remove_duplicates(line) for line in complete_lines]
 
     def draw_hough_lines(self, image_shape : Tuple[int, int, int]):
         """ Draws the hough lines.

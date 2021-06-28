@@ -14,7 +14,7 @@ from openpilot.models.lane_detect.lane_models.lane_generator_tsf import ( LaneGe
                                                                         , )
 
 
-class LaneGeneratorTUHough(LaneGeneratorTUShrink):
+class HoughLineMixinTU:
     """ Tusimple images
         720 x 1280 is the pic shape
     """
@@ -37,22 +37,30 @@ class LaneGeneratorTUHough(LaneGeneratorTUShrink):
                             , roi_vertices=self.ROIS
                             , hough_params=hough_params )
 
-        hough_img = cv2.cvtColor(cl.show_lines(first_img.shape[:2]).astype(np.uint8) * 255, cv2.COLOR_BGR2RGB)
+        hough_img = cv2.cvtColor(cl.show_lines(first_img.shape[:2], pixel_tol=2).astype(np.uint8) * 255, cv2.COLOR_BGR2RGB)
 
         return cv2.addWeighted(first_img, 0.6, hough_img, 0.8, 0)
 
 
-class YellowLineTU(LaneGeneratorTUHough):
+class HoughLineMixinCU(HoughLineMixinTU):
+    # cu image is 590 x 1640
+    _y_factor = 590/720
+    _x_factor = 1640/1280
 
-    # good values for y are
-    # (0, 175, 0) - (255,255,255)
-    # (0, 175, 180) - (255,255,255)  <- THIS IS CHOSEN
+    ROIS = []
+    for x, y in HoughLineMixinTU.ROIS:
+        ROIS.append(( int(x * _x_factor), int(y * _y_factor) ))
 
-    def __init__(self, *args, **kwargs):
-        super().__init__(*args, **kwargs)
 
-        self._y_vec = [0, 175, 180, 255, 255, 255]
+class LaneGeneratorTUHough(HoughLineMixinTU, LaneGeneratorTUShrink):
+    pass
 
+
+class LaneGeneratorCUHough(HoughLineMixinCU, LaneGeneratorCUShrink):
+    pass
+
+
+class YellowLineMixin:
     def _process_X(self, orig_image) -> Union[None, np.ndarray]:
 
         yellow_mask = cv2.inRange(orig_image, np.uint8(self._y_vec[:3]), np.uint8(self._y_vec[3:]))
@@ -77,16 +85,27 @@ class YellowLineTU(LaneGeneratorTUHough):
         return cv2.addWeighted(yellow_line_img, 0.6, hough_img, 0.8, 0)
 
 
-class YellowLineTUSliders(YellowLineTU):
-    """ Yellow line but with sliders.
-    """
+class YellowLineTU(YellowLineMixin, LaneGeneratorTUHough ):
+
+    # good values for y are
+    # (0, 175, 0) - (255,255,255)
+    # (0, 175, 180) - (255,255,255)  <- THIS IS CHOSEN
 
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
 
-        # add the sliders from Tkinter
-        sliders_th = threading.Thread(target = lambda : self._sliders())
-        sliders_th.start()
+        self._y_vec = [0, 175, 180, 255, 255, 255]
+
+
+class YellowLineCU(YellowLineMixin, LaneGeneratorCUHough):
+
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+
+        self._y_vec = [0, 175, 180, 255, 255, 255]
+
+
+class YellowLineSlidersMixin:
 
     def __update_yellows(self, y_vec):
         self._y_vec = y_vec
@@ -123,50 +142,28 @@ class YellowLineTUSliders(YellowLineTU):
         canvas.mainloop()
 
 
-class RoadTU(YellowLineTU):
+class YellowLineTUSliders(YellowLineSlidersMixin, YellowLineTU):
+    """ Yellow line but with sliders.
+    """
 
-    def _process_X(self, orig_image) -> Union[None, np.ndarray]:
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
 
-        image = orig_image
-        # crop image
-        h, w = image.shape[:2]
-        #image = image[200:h - 20, 20:550]
-        # create hsv
-        hsv = cv2.cvtColor(image, cv2.COLOR_BGR2HSV)
+        # add the sliders from Tkinter
+        sliders_th = threading.Thread(target = lambda : self._sliders())
+        sliders_th.start()
 
-        #low_val = (0, 0, 0)
-        #high_val = (179, 45, 96)
-        low_val = np.uint8(self._y_vec[:3])
-        high_val = np.uint8(self._y_vec[3:])
-        # Threshold the HSV image
-        mask = cv2.inRange(hsv, low_val, high_val)
 
-        # remove noise
-        mask = cv2.morphologyEx(mask, cv2.MORPH_OPEN, kernel=np.ones((8, 8), dtype=np.uint8))
-        # close mask
-        mask = cv2.morphologyEx(mask, cv2.MORPH_CLOSE, kernel=np.ones((20, 20), dtype=np.uint8))
+class YellowLineCUSliders(YellowLineSlidersMixin, YellowLineCU):
+    """ Yellow line but with sliders.
+    """
 
-        # improve mask by drawing the convexhull
-        contours, _ = cv2.findContours(mask, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
-        for cnt in contours:
-            hull = cv2.convexHull(cnt)
-            cv2.drawContours(mask, [hull], 0, (255), -1)
-        # erode mask a bit to migitate mask bleed of convexhull
-        mask = cv2.morphologyEx(mask, cv2.MORPH_ERODE, kernel=np.ones((5, 5), dtype=np.uint8))
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
 
-        # remove this line, used to show intermediate result of masked road
-        road = cv2.bitwise_and(image, image, mask=mask)
-
-        return road
-        # apply mask to hsv image
-        road_hsv = cv2.bitwise_and(hsv, hsv, mask=mask)
-        # set lower and upper color limits
-        low_val = (0, 0, 102)
-        high_val = (179, 255, 255)
-        # Threshold the HSV image
-        mask2 = cv2.inRange(road_hsv, low_val, high_val)
-        # apply mask to original image
-        return cv2.bitwise_and(image, image, mask=mask2)
+        # add the sliders from Tkinter
+        sliders_th = threading.Thread(target = lambda : self._sliders())
+        sliders_th.start()
 
 
 
@@ -196,15 +193,15 @@ def example_1():
 
     from openpilot.models.lane_detect.lane_config import BASE_CU
 
-    train_generator = LaneGeneratorTUHough( BASE_CU
+    train_generator = YellowLineCUSliders( BASE_CU
                                      , to_train = True
                                      , train_percentage  = train_percentage
                                      , batch_size=batch_size )
 
-    train_generator.show_movie_with_lanes()
+    train_generator.show_movie_cont()
 
 
-example_2()
+# example_1()
 
 
 # yellow line:
