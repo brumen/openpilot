@@ -25,7 +25,7 @@ def lane_model_5(input_shape : Tuple[int, int ,int], pool_size : Tuple[int, int]
 
     # layers in between
     between_layers = [ Dense(31, name='Between_1')
-                     , Dense(63, name='Between_2')
+                     , Dense(30, name='Between_2')
                      , ]
 
     return model_from_layers(encoder + between_layers + decoder)
